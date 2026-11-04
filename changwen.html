@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>长文排版工坊 · 本地版</title>
+  <style>
+:root{
+  --paper:#f7f4ef;
+  --paper-2:#efe9e0;
+  --ink:#3a352e;
+  --ink-soft:#6b6258;
+  --brown:#8a6a45;
+  --brown-2:#a9855c;
+  --line:#e3dccf;
+  --accent:#9c6b3f;
+  --shadow:0 8px 30px rgba(80,60,35,.12);
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; height:100%; }
+body{
+  font-family:"PingFang SC","Microsoft YaHei",-apple-system,system-ui,sans-serif;
+  color:var(--ink);
+  background:linear-gradient(180deg,#fbf8f3,#f3ece1);
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+}
+/* 顶栏 */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 20px; background:rgba(255,255,255,.7); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line); flex:0 0 auto;
+}
+.brand{ font-size:19px; font-weight:700; letter-spacing:.5px; color:var(--brown); }
+.brand-sub{ font-size:12px; font-weight:400; color:var(--ink-soft); margin-left:8px; }
+.top-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+/* 按钮 */
+.btn{
+  border:1px solid var(--line); background:#fff; color:var(--ink);
+  padding:8px 14px; border-radius:9px; cursor:pointer; font-size:13px;
+  transition:.15s; white-space:nowrap;
+}
+.btn:hover{ border-color:var(--brown-2); color:var(--brown); }
+.btn:active{ transform:translateY(1px); }
+.btn-primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn-primary:hover{ background:#854f29; color:#fff; }
+.btn-ghost{ background:transparent; }
+.btn-block{ width:100%; margin-top:10px; }
+
+/* 布局 */
+.layout{ flex:1 1 auto; display:flex; min-height:0; }
+.panel{
+  width:380px; flex:0 0 380px; overflow-y:auto; padding:18px;
+  background:var(--paper); border-right:1px solid var(--line);
+}
+.panel::-webkit-scrollbar{ width:8px; }
+.panel::-webkit-scrollbar-thumb{ background:#d8cdba; border-radius:8px; }
+
+.block{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow); }
+.block-title{ margin:0 0 12px; font-size:14px; color:var(--brown); border-left:3px solid var(--brown-2); padding-left:8px; }
+.field{ display:block; margin-bottom:12px; }
+.field:last-child{ margin-bottom:0; }
+.field-label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:5px; }
+.field-label b{ color:var(--accent); font-weight:700; }
+.input{
+  width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:9px;
+  font-size:13px; color:var(--ink); background:#fffdfa; outline:none;
+}
+.input:focus{ border-color:var(--brown-2); box-shadow:0 0 0 3px rgba(169,133,92,.15); }
+.textarea{ resize:vertical; line-height:1.7; font-family:inherit; }
+.range{ padding:0; height:auto; accent-color:var(--accent); }
+.color{ height:38px; padding:3px; cursor:pointer; }
+select.input{ appearance:none; background:#fffdfa; }
+.row2{ display:flex; gap:10px; }
+.row2 .field{ flex:1; }
+.counter{ float:right; font-weight:400; color:var(--ink-soft); }
+.hint{ font-size:11px; color:var(--ink-soft); margin-top:8px; line-height:1.5; }
+
+/* 预览舞台 */
+.stage{ flex:1 1 auto; display:flex; flex-direction:column; min-width:0; background:#ece4d7; }
+.stage-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 18px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.5); flex:0 0 auto;
+}
+.stage-title{ font-size:13px; color:var(--brown); font-weight:600; }
+.save-hint{ font-size:12px; color:#3f9d6b; }
+.preview-scroll{ flex:1 1 auto; overflow:auto; padding:24px; display:flex; justify-content:center; align-items:flex-start; }
+#previewCanvas{
+  max-width:100%; height:auto; border-radius:6px;
+  box-shadow:0 10px 40px rgba(60,40,20,.25); background:#fff;
+}
+
+/* 提示与加载 */
+.toast{
+  position:fixed; left:50%; bottom:30px; transform:translateX(-50%) translateY(20px);
+  background:rgba(40,32,24,.92); color:#fff; padding:10px 18px; border-radius:10px;
+  font-size:13px; opacity:0; pointer-events:none; transition:.25s; z-index:50;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.loading{
+  position:fixed; inset:0; background:rgba(247,244,239,.7); backdrop-filter:blur(2px);
+  display:flex; align-items:center; justify-content:center; gap:12px; z-index:60; color:var(--brown); font-size:14px;
+}
+.spinner{ width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+@media (max-width:860px){
+  .layout{ flex-direction:column; }
+  .panel{ width:100%; flex:0 0 auto; max-height:46vh; }
+  .stage{ min-height:54vh; }
+}
+
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">长文排版工坊 <span class="brand-sub">本地可用 · 数据不丢失</span></div>
+    <div class="top-actions">
+      <button class="btn btn-primary" id="btnExportLong">导出长图</button>
+      <button class="btn" id="btnExportSlices">等分切割导出</button>
+      <button class="btn btn-ghost" id="btnImportDocx">导入 DOCX</button>
+      <button class="btn btn-ghost" id="btnBackup">备份 JSON</button>
+      <button class="btn btn-ghost" id="btnRestore">恢复 JSON</button>
+      <input type="file" id="fileDocx" accept=".docx" hidden>
+      <input type="file" id="fileRestore" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 左侧控制面板 -->
+    <aside class="panel">
+      <section class="block">
+        <h3 class="block-title">文字内容</h3>
+        <label class="field"><span class="field-label">标题</span>
+          <input id="inpTitle" class="input" type="text" placeholder="文章标题"></label>
+        <label class="field"><span class="field-label">副标题</span>
+          <input id="inpSubtitle" class="input" type="text" placeholder="副标题（可空）"></label>
+        <label class="field"><span class="field-label">作者</span>
+          <input id="inpAuthor" class="input" type="text" placeholder="作者名"></label>
+        <label class="field"><span class="field-label">约稿人</span>
+          <input id="inpCommissioner" class="input" type="text" placeholder="约稿人（可空）"></label>
+        <label class="field">
+          <span class="field-label">正文
+            <span class="counter" id="wordCount">0 字</span>
+          </span>
+          <textarea id="inpBody" class="input textarea" rows="10" placeholder="把正文粘贴到这里，或点上方「导入 DOCX」……"></textarea>
+        </label>
+        <button class="btn btn-ghost btn-block" id="btnPickDocx">从 Word(.docx) 读入正文</button>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title">字体与颜色</h3>
+        <div class="row2">
+          <label class="field"><span class="field-label">标题字体</span>
+            <select id="selTitleFont" class="input"></select></label>
+          <label class="field"><span class="field-label">正文字体</span>
+            <select id="selBodyFont" class="input"></select></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span class="field-label">标题字号 <b id="valTitleSize">64</b> px</span>
+            <input id="inpTitleSize" class="input range" type="range" min="24" max="160" step="1"></label>
+          <label class="field"><span class="field-label">正文字号 <b id="valBodySize">34</b> px</span>
+            <input id="inpBodySize" class="input range" type="range" min="14" max="80" step="1"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span class="field-label">标题颜色</span>
+            <input id="inpTitleColor" class="input color" type="color"></label>
+          <label class="field"><span class="field-label">正文颜色</span>
+            <input id="inpBodyColor" class="input color" type="color"></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span class="field-label">行距 <b id="valLineHeight">1.8</b></span>
+            <input id="inpLineHeight" class="input range" type="range" min="1.2" max="3" step="0.05"></label>
+          <label class="field"><span class="field-label">段距 <b id="valPara">24</b> px</span>
+            <input id="inpParaSpacing" class="input range" type="range" min="0" max="80" step="2"></label>
+        </div>
+        <label class="field"><span class="field-label">对齐</span>
+          <select id="selAlign" class="input">
+            <option value="left">居左</option>
+            <option value="center">居中</option>
+          </select></label>
+        <button class="btn btn-ghost btn-block" id="btnCustomFont">上传自定义字体(.ttf/.otf)</button>
+        <input type="file" id="fileCustomFont" accept=".ttf,.otf,font/ttf,font/otf" hidden>
+        <div class="hint" id="customFontHint">未加载自定义字体</div>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title">背景</h3>
+        <label class="field"><span class="field-label">背景类型</span>
+          <select id="selBgType" class="input">
+            <option value="solid">纯色</option>
+            <option value="gradient">渐变</option>
+            <option value="texture">纹理</option>
+            <option value="image">图片</option>
+          </select></label>
+        <div class="row2">
+          <label class="field"><span class="field-label">主色</span>
+            <input id="inpBgColor" class="input color" type="color"></label>
+          <label class="field" id="wrapBgColor2"><span class="field-label">辅色</span>
+            <input id="inpBgColor2" class="input color" type="color"></label>
+        </div>
+        <label class="field" id="wrapTexture"><span class="field-label">纹理</span>
+          <select id="selTexture" class="input">
+            <option value="rice">宣纸</option>
+            <option value="kraft">牛皮纸</option>
+            <option value="dots">点阵</option>
+            <option value="lines">简约线条</option>
+            <option value="grid">方格</option>
+          </select></label>
+        <button class="btn btn-ghost btn-block" id="btnBgImage">上传背景图</button>
+        <input type="file" id="fileBgImage" accept="image/*" hidden>
+        <div class="hint" id="bgImageHint">未上传背景图</div>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title">画布与导出</h3>
+        <div class="row2">
+          <label class="field"><span class="field-label">画布宽 <b id="valWidth">1080</b> px</span>
+            <input id="inpWidth" class="input range" type="range" min="600" max="2000" step="20"></label>
+          <label class="field"><span class="field-label">边距 <b id="valPadding">90</b> px</span>
+            <input id="inpPadding" class="input range" type="range" min="20" max="240" step="5"></label>
+        </div>
+        <label class="field"><span class="field-label">切割每张高度 <b id="valSlice">1080</b> px</span>
+          <input id="inpSliceH" class="input range" type="range" min="600" max="2000" step="20"></label>
+        <div class="hint">「等分切割导出」会把长图按「每张高度」切成大小相同的图，方便发小红书 / 朋友圈。</div>
+      </section>
+    </aside>
+
+    <!-- 右侧预览 -->
+    <section class="stage">
+      <div class="stage-bar">
+        <span class="stage-title">实时预览</span>
+        <span class="save-hint" id="saveHint">已自动保存</span>
+      </div>
+      <div class="preview-scroll" id="previewScroll">
+        <canvas id="previewCanvas"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <div class="loading" id="loading" hidden><div class="spinner"></div><span id="loadingText">处理中…</span></div>
+
+  
+<script>
+/* 长文排版工坊 · 核心工具
+ * 零依赖、离线可用。所有函数挂在 window.CW 命名空间下。
+ */
+(function () {
+  var CW = (window.CW = {});
+
+  /* ---------- 小工具 ---------- */
+  CW.$ = function (s, r) { return (r || document).querySelector(s); };
+  CW.$$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  CW.debounce = function (fn, ms) {
+    var t; return function () { var a = arguments, c = this; clearTimeout(t); t = setTimeout(function () { fn.apply(c, a); }, ms); };
+  };
+  CW.clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
+
+  /* ---------- 字体 ---------- */
+  CW.FONTS = [
+    { id: 'system', name: '系统默认', stack: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif' },
+    { id: 'song', name: '宋体', stack: '"SimSun", "Songti SC", "Source Han Serif SC", serif' },
+    { id: 'hei', name: '黑体', stack: '"SimHei", "Heiti SC", "Source Han Sans SC", sans-serif' },
+    { id: 'kai', name: '楷体', stack: '"KaiTi", "Kaiti SC", "STKaiti", serif' },
+    { id: 'yahei', name: '微软雅黑', stack: '"Microsoft YaHei", sans-serif' },
+    { id: 'fangsong', name: '仿宋', stack: '"FangSong", "FangSong_GB2312", serif' },
+    { id: 'custom', name: '自定义字体', stack: '' }
+  ];
+  CW.fontStack = function (id, customName) {
+    if (id === 'custom' && customName) return '"' + customName + '", sans-serif';
+    var f = null;
+    for (var i = 0; i < CW.FONTS.length; i++) if (CW.FONTS[i].id === id) f = CW.FONTS[i];
+    return f ? f.stack : CW.FONTS[0].stack;
+  };
+  CW.fontName = function (id) {
+    for (var i = 0; i < CW.FONTS.length; i++) if (CW.FONTS[i].id === id) return CW.FONTS[i].name;
+    return '系统默认';
+  };
+  /* 用 FontFace 注册自定义字体（离线 dataURL 也行） */
+  CW.registerCustomFont = function (name, dataURL) {
+    return new Promise(function (res, rej) {
+      try {
+        if (!('FontFace' in window)) { rej(new Error('当前浏览器不支持自定义字体')); return; }
+        var face = new FontFace(name, 'url(' + dataURL + ')');
+        face.load().then(function (loaded) { document.fonts.add(loaded); res(); })
+          .catch(function (e) { rej(e); });
+      } catch (e) { rej(e); }
+    });
+  };
+
+  /* ---------- DOCX 解析（零依赖：手写 ZIP + 浏览器原生 deflate 解压） ---------- */
+  function decodeEntities(s) {
+    return s
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+      .replace(/&#x([0-9a-fA-F]+);/g, function (_, h) { return String.fromCodePoint(parseInt(h, 16)); })
+      .replace(/&#(\d+);/g, function (_, d) { return String.fromCodePoint(parseInt(d, 10)); });
+  }
+  function readZipStr(bytes, off, len) {
+    var s = '';
+    for (var i = 0; i < len; i++) s += String.fromCharCode(bytes[off + i]);
+    try { return decodeURIComponent(escape(s)); } catch (_) { return s; }
+  }
+  async function inflateRaw(bytes) {
+    if (typeof DecompressionStream === 'undefined')
+      throw new Error('当前浏览器不支持解压，请改用 .txt 或更新浏览器');
+    var ds = new DecompressionStream('deflate-raw');
+    var w = ds.writable.getWriter();
+    w.write(bytes); w.close();
+    var chunks = [], total = 0, r = ds.readable.getReader();
+    for (;;) { var x = await r.read(); if (x.done) break; chunks.push(x.value); total += x.value.length; }
+    var out = new Uint8Array(total), o = 0;
+    for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], o); o += chunks[i].length; }
+    return out;
+  }
+  function docXmlToText(xml) {
+    var paras = xml.split(/<\/w:p>/);
+    var out = [];
+    for (var i = 0; i < paras.length; i++) {
+      var re = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g, m, line = '';
+      while ((m = re.exec(paras[i]))) line += decodeEntities(m[1]);
+      if (line.trim()) out.push(line.trim());
+    }
+    return out.join('\n\n');
+  }
+  CW.parseDocxText = async function (ab) {
+    var bytes = new Uint8Array(ab), dv = new DataView(ab);
+    var eocd = -1;
+    for (var i = bytes.length - 22; i >= 0; i--) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('不是有效的 .docx 文件');
+    var cdOffset = dv.getUint32(eocd + 16, true);
+    var cdCount = dv.getUint16(eocd + 10, true);
+    var pos = cdOffset, docXml = null;
+    for (var n = 0; n < cdCount; n++) {
+      if (dv.getUint32(pos, true) !== 0x02014b50) break;
+      var method = dv.getUint16(pos + 10, true);
+      var compSize = dv.getUint32(pos + 20, true);
+      var nameLen = dv.getUint16(pos + 28, true);
+      var extraLen = dv.getUint16(pos + 30, true);
+      var commentLen = dv.getUint16(pos + 32, true);
+      var lho = dv.getUint32(pos + 42, true);
+      var fname = readZipStr(bytes, pos + 46, nameLen);
+      if (/word\/document\.xml$/i.test(fname)) {
+        var lNameLen = dv.getUint16(lho + 26, true);
+        var lExtraLen = dv.getUint16(lho + 28, true);
+        var dataOff = lho + 30 + lNameLen + lExtraLen;
+        var comp = bytes.subarray(dataOff, dataOff + compSize);
+        if (method === 0) docXml = new TextDecoder('utf-8').decode(comp);
+        else if (method === 8) docXml = new TextDecoder('utf-8').decode(await inflateRaw(comp));
+        else throw new Error('不支持的压缩方式');
+        break;
+      }
+      pos += 46 + nameLen + extraLen + commentLen;
+    }
+    if (!docXml) throw new Error('docx 中未找到 word/document.xml');
+    return docXmlToText(docXml);
+  };
+
+  /* ---------- 背景绘制 ---------- */
+  CW.TEXTURES = ['rice', 'kraft', 'dots', 'lines', 'grid'];
+  function rng(seed) {
+    return function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  }
+  function hexA(hex, a) {
+    // 把 #rrggbb 转成 rgba
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+  CW.drawBackground = function (ctx, bg, w, h, img) {
+    bg = bg || { type: 'solid', color: '#f7f3ea' };
+    // 兜底填充（切割最后一张不足高度时也用它）
+    var base = bg.color || '#f7f3ea';
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+
+    if (bg.type === 'image') {
+      if (img && img.complete && img.naturalWidth) {
+        var ir = img.naturalWidth / img.naturalHeight, cr = w / h, dw, dh, dx, dy;
+        if (ir > cr) { dh = h; dw = h * ir; dx = (w - dw) / 2; dy = 0; }
+        else { dw = w; dh = w / ir; dx = 0; dy = (h - dh) / 2; }
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+      return;
+    }
+    if (bg.type === 'gradient') {
+      var g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, bg.color || '#f7f3ea');
+      g.addColorStop(1, bg.color2 || '#e9dcc6');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      return;
+    }
+    // 纹理：先铺底色
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+    var acc = bg.color2 || '#000000';
+    var t = bg.texture || 'rice';
+    if (t === 'rice') {
+      var r = rng(7);
+      for (var i = 0; i < (w * h) / 700; i++) {
+        var x = r() * w, y = r() * h, a = 0.03 + r() * 0.05;
+        ctx.fillStyle = hexA(acc, a);
+        ctx.fillRect(x, y, 1.5, 1.5);
+      }
+    } else if (t === 'kraft') {
+      var r2 = rng(11);
+      ctx.strokeStyle = hexA(acc, 0.10); ctx.lineWidth = 1;
+      for (var j = 0; j < (w * h) / 5000; j++) {
+        var x1 = r2() * w, y1 = r2() * h, len = 6 + r2() * 22;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 + (r2() - 0.5) * 6, y1 + len); ctx.stroke();
+      }
+    } else if (t === 'dots') {
+      ctx.fillStyle = hexA(acc, 0.18);
+      var step = 26;
+      for (var y3 = step; y3 < h; y3 += step)
+        for (var x3 = step; x3 < w; x3 += step) { ctx.beginPath(); ctx.arc(x3, y3, 2.2, 0, 6.2832); ctx.fill(); }
+    } else if (t === 'lines') {
+      ctx.strokeStyle = hexA(acc, 0.10); ctx.lineWidth = 1;
+      for (var y4 = 60; y4 < h; y4 += 64) { ctx.beginPath(); ctx.moveTo(0, y4); ctx.lineTo(w, y4); ctx.stroke(); }
+    } else if (t === 'grid') {
+      ctx.strokeStyle = hexA(acc, 0.10); ctx.lineWidth = 1;
+      var s = 48;
+      for (var x5 = 0; x5 <= w; x5 += s) { ctx.beginPath(); ctx.moveTo(x5, 0); ctx.lineTo(x5, h); ctx.stroke(); }
+      for (var y5 = 0; y5 <= h; y5 += s) { ctx.beginPath(); ctx.moveTo(0, y5); ctx.lineTo(w, y5); ctx.stroke(); }
+    }
+  };
+})();
+
+</script>
+<script>
+/* 长文排版工坊 · 排版引擎
+ * 负责把配置量算成「绘制指令」，并支持按切片渲染（长图 / 等分切割共用）。
+ */
+(function () {
+  var CW = window.CW;
+  var mctx = document.createElement('canvas').getContext('2d');
+
+  /* 按宽度把一段文字折行（CJK 逐字、遇空格优先断行） */
+  function wrapText(ctx, text, font, maxW) {
+    ctx.font = font;
+    var lines = [];
+    var paras = String(text == null ? '' : text).split('\n');
+    for (var p = 0; p < paras.length; p++) {
+      var para = paras[p];
+      if (para === '') { lines.push(''); continue; }
+      var cur = '';
+      for (var i = 0; i < para.length; i++) {
+        var ch = para[i];
+        var test = cur + ch;
+        if (ctx.measureText(test).width > maxW && cur !== '') {
+          lines.push(cur.replace(/\s+$/, ''));
+          cur = /^\s/.test(ch) ? '' : ch;
+        } else {
+          cur = test;
+        }
+      }
+      if (cur !== '') lines.push(cur.replace(/\s+$/, ''));
+    }
+    return lines;
+  }
+
+  /* 量算：返回绘制指令 ops + 总高度 */
+  CW.computeLayout = function (cfg) {
+    var W = cfg.width | 0, pad = cfg.padding | 0;
+    var cw = W - pad * 2;
+    var align = cfg.align || 'left';
+    var titleFont = cfg.titleSize + 'px ' + CW.fontStack(cfg.titleFont, cfg.customFontName);
+    var subFont = Math.round(cfg.titleSize * 0.6) + 'px ' + CW.fontStack(cfg.titleFont, cfg.customFontName);
+    var metaFont = Math.round(cfg.bodySize * 0.92) + 'px ' + CW.fontStack(cfg.bodyFont, cfg.customFontName);
+    var bodyFont = cfg.bodySize + 'px ' + CW.fontStack(cfg.bodyFont, cfg.customFontName);
+    var bodyLH = Math.round(cfg.bodySize * cfg.lineHeight);
+    var paraGap = cfg.paraSpacing | 0;
+    var titleColor = cfg.titleColor, bodyColor = cfg.bodyColor;
+
+    var ops = [];
+    var y = pad;
+
+    // 标题（可多行）
+    if (cfg.title) {
+      var tl = wrapText(mctx, cfg.title, titleFont, cw);
+      tl.forEach(function (ln, i) {
+        ops.push({ kind: 'title', text: ln, y: y, font: titleFont, color: titleColor, align: align });
+        y += Math.round(cfg.titleSize * 1.18);
+      });
+    }
+    y += Math.round(cfg.titleSize * 0.45);
+
+    // 副标题
+    if (cfg.subtitle) {
+      var sl = wrapText(mctx, cfg.subtitle, subFont, cw);
+      sl.forEach(function (ln) {
+        ops.push({ kind: 'sub', text: ln, y: y, font: subFont, color: titleColor, align: align });
+        y += Math.round(cfg.titleSize * 0.72);
+      });
+      y += Math.round(cfg.titleSize * 0.3);
+    }
+
+    // 作者 / 约稿人
+    var meta = [];
+    if (cfg.author) meta.push('作者：' + cfg.author);
+    if (cfg.commissioner) meta.push('约稿人：' + cfg.commissioner);
+    if (meta.length) {
+      ops.push({ kind: 'meta', text: meta.join('　·　'), y: y, font: metaFont, color: titleColor, align: align });
+      y += Math.round(cfg.bodySize * 1.2);
+    }
+
+    y += Math.round(cfg.titleSize * 0.7); // 标题区与正文之间的留白
+    var headerBottom = y;
+
+    // 正文：按自然段（空行分段）
+    var blocks = String(cfg.body || '').split(/\n{2,}/);
+    for (var b = 0; b < blocks.length; b++) {
+      var blk = blocks[b].replace(/^\n+|\n+$/g, '');
+      if (blk === '') continue;
+      var bl = wrapText(mctx, blk, bodyFont, cw);
+      for (var k = 0; k < bl.length; k++) {
+        ops.push({ kind: 'body', text: bl[k], y: y, font: bodyFont, color: bodyColor, align: align });
+        y += bodyLH;
+      }
+      y += paraGap;
+    }
+
+    // 高度由内容决定；只保留一个很小的最小高度，避免空稿时画布塌成 0
+    var totalHeight = Math.max(y + pad, pad * 2 + 200);
+    return {
+      W: W, pad: pad, cw: cw, align: align, bodyLH: bodyLH,
+      ops: ops, headerBottom: headerBottom, totalHeight: totalHeight
+    };
+  };
+
+  /* 渲染某一纵向区间 [segTop, segTop+segH) 到 ctx（已按 segH 裁剪） */
+  CW.renderSegment = function (ctx, cfg, layout, segTop, segH, bgImg) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, layout.W, segH); ctx.clip();
+    ctx.translate(0, -segTop);
+    CW.drawBackground(ctx, cfg.bg, layout.W, layout.totalHeight, bgImg);
+    ctx.textBaseline = 'top';
+    for (var i = 0; i < layout.ops.length; i++) {
+      var op = layout.ops[i];
+      if (op.y < segTop - 400 || op.y > segTop + segH + 400) continue;
+      ctx.font = op.font;
+      ctx.fillStyle = op.color;
+      ctx.textAlign = op.align === 'center' ? 'center' : 'left';
+      var x = op.align === 'center' ? layout.W / 2 : layout.pad;
+      ctx.fillText(op.text, x, op.y);
+    }
+    ctx.restore();
+  };
+
+  /* 导出：整张长图 */
+  CW.renderLong = function (cfg, bgImg) {
+    var layout = CW.computeLayout(cfg);
+    var cv = document.createElement('canvas');
+    cv.width = layout.W; cv.height = layout.totalHeight;
+    CW.renderSegment(cv.getContext('2d'), cfg, layout, 0, layout.totalHeight, bgImg);
+    return cv;
+  };
+
+  /* 导出：按 segH 等分切割（最后一张不足也补齐到 segH，保证大小相同） */
+  CW.renderSlices = function (cfg, segH, bgImg) {
+    var layout = CW.computeLayout(cfg);
+    var total = layout.totalHeight;
+    var n = Math.max(1, Math.ceil(total / segH));
+    var cans = [];
+    for (var k = 0; k < n; k++) {
+      var top = k * segH;
+      var cv = document.createElement('canvas');
+      cv.width = layout.W; cv.height = segH;
+      CW.renderSegment(cv.getContext('2d'), cfg, layout, top, segH, bgImg);
+      cans.push(cv);
+    }
+    return cans;
+  };
+})();
+
+</script>
+<script>
+/* 长文排版工坊 · 本地持久化
+ * 自动存到 localStorage（数据留在你自己的浏览器，不会丢）；
+ * 也支持导出 / 导入 JSON 备份文件。
+ */
+(function () {
+  var CW = window.CW;
+  var KEY = 'cw_project_v1';
+
+  CW.store = {
+    save: function (cfg) {
+      try { localStorage.setItem(KEY, JSON.stringify(cfg)); return true; }
+      catch (e) { return false; }
+    },
+    load: function () {
+      try {
+        var s = localStorage.getItem(KEY);
+        if (!s) return null;
+        var o = JSON.parse(s);
+        // 老版本缺字段时补默认
+        return o && typeof o === 'object' ? o : null;
+      } catch (e) { return null; }
+    },
+    exportJSON: function (cfg) { return JSON.stringify(cfg, null, 2); },
+    importJSON: function (str) { return JSON.parse(str); },
+    clear: function () { try { localStorage.removeItem(KEY); } catch (e) {} }
+  };
+})();
+
+</script>
+<script>
+/* 长文排版工坊 · 交互与导出
+ * 所有控件均真实可用；数据自动存到浏览器本地（localStorage）。
+ */
+(function () {
+  var CW = window.CW;
+  var $ = CW.$;
+
+  /* ---------- 默认配置 ---------- */
+  function defaultCfg() {
+    return {
+      title: '在这里写标题',
+      subtitle: '副标题写这里',
+      author: '',
+      commissioner: '',
+      body: '把正文粘贴到这里，或点上方「导入 DOCX」。\n\n空行分段，段落之间会自动留出间距。字号、颜色、背景都能调，调完右侧实时预览。',
+      titleFont: 'song', bodyFont: 'system',
+      titleSize: 64, bodySize: 34,
+      titleColor: '#2b2620', bodyColor: '#3a352e',
+      lineHeight: 1.8, paraSpacing: 24, align: 'left',
+      width: 1080, padding: 90,
+      bg: { type: 'solid', color: '#f7f3ea', color2: '#e9dcc6', texture: 'rice' },
+      customFontName: '', customFontData: '',
+      sliceH: 1080
+    };
+  }
+
+  var S = { cfg: defaultCfg() };
+
+  /* ---------- 提示 / 加载 ---------- */
+  var toastTimer;
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+  function loading(on, text) {
+    var l = $('#loading'); if (!l) return;
+    if (on) { l.hidden = false; if (text) $('#loadingText').textContent = text; }
+    else l.hidden = true;
+  }
+
+  /* ---------- 字体下拉 ---------- */
+  function fillFontSelects() {
+    var ts = $('#selTitleFont'), bs = $('#selBodyFont');
+    CW.FONTS.forEach(function (f) {
+      ts.appendChild(new Option(f.name, f.id));
+      bs.appendChild(new Option(f.name, f.id));
+    });
+  }
+
+  /* ---------- 把配置写回 UI ---------- */
+  function fillUI() {
+    var c = S.cfg;
+    $('#inpTitle').value = c.title;
+    $('#inpSubtitle').value = c.subtitle;
+    $('#inpAuthor').value = c.author;
+    $('#inpCommissioner').value = c.commissioner;
+    $('#inpBody').value = c.body;
+    $('#selTitleFont').value = c.titleFont;
+    $('#selBodyFont').value = c.bodyFont;
+    $('#inpTitleSize').value = c.titleSize; $('#valTitleSize').textContent = c.titleSize;
+    $('#inpBodySize').value = c.bodySize; $('#valBodySize').textContent = c.bodySize;
+    $('#inpTitleColor').value = c.titleColor;
+    $('#inpBodyColor').value = c.bodyColor;
+    $('#inpLineHeight').value = c.lineHeight; $('#valLineHeight').textContent = c.lineHeight;
+    $('#inpParaSpacing').value = c.paraSpacing; $('#valPara').textContent = c.paraSpacing;
+    $('#selAlign').value = c.align;
+    $('#inpWidth').value = c.width; $('#valWidth').textContent = c.width;
+    $('#inpPadding').value = c.padding; $('#valPadding').textContent = c.padding;
+    $('#inpSliceH').value = c.sliceH; $('#valSlice').textContent = c.sliceH;
+    $('#selBgType').value = c.bg.type;
+    $('#inpBgColor').value = c.bg.color;
+    $('#inpBgColor2').value = c.bg.color2 || '#e9dcc6';
+    $('#selTexture').value = c.bg.texture || 'rice';
+    updateBgControls();
+    updateWordCount();
+    if (c.customFontName) $('#customFontHint').textContent = '已加载：' + c.customFontName;
+    if (c.bg.type === 'image' && c.bg.image) $('#bgImageHint').textContent = '已上传背景图';
+  }
+
+  function updateBgControls() {
+    var t = S.cfg.bg.type;
+    $('#wrapBgColor2').style.display = (t === 'gradient' || t === 'texture') ? '' : 'none';
+    $('#wrapTexture').style.display = (t === 'texture') ? '' : 'none';
+  }
+
+  function updateWordCount() {
+    var n = (S.cfg.body || '').replace(/\s/g, '').length;
+    $('#wordCount').textContent = n + ' 字';
+  }
+
+  /* ---------- 从 UI 读回配置 ---------- */
+  function syncFromUI() {
+    var c = S.cfg;
+    c.title = $('#inpTitle').value;
+    c.subtitle = $('#inpSubtitle').value;
+    c.author = $('#inpAuthor').value;
+    c.commissioner = $('#inpCommissioner').value;
+    c.body = $('#inpBody').value;
+    c.titleFont = $('#selTitleFont').value;
+    c.bodyFont = $('#selBodyFont').value;
+    c.titleSize = +$('#inpTitleSize').value;
+    c.bodySize = +$('#inpBodySize').value;
+    c.titleColor = $('#inpTitleColor').value;
+    c.bodyColor = $('#inpBodyColor').value;
+    c.lineHeight = +$('#inpLineHeight').value;
+    c.paraSpacing = +$('#inpParaSpacing').value;
+    c.align = $('#selAlign').value;
+    c.width = +$('#inpWidth').value;
+    c.padding = +$('#inpPadding').value;
+    c.sliceH = +$('#inpSliceH').value;
+    c.bg.type = $('#selBgType').value;
+    c.bg.color = $('#inpBgColor').value;
+    c.bg.color2 = $('#inpBgColor2').value;
+    c.bg.texture = $('#selTexture').value;
+  }
+
+  /* ---------- 预览 ---------- */
+  function ensureFont(cb) {
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(cb); else cb();
+  }
+  function renderPreview() {
+    ensureFont(function () {
+      try {
+        var layout = CW.computeLayout(S.cfg);
+        var scale = Math.min(1, 460 / S.cfg.width);
+        var cv = $('#previewCanvas');
+        cv.width = Math.round(layout.W * scale);
+        cv.height = Math.round(layout.totalHeight * scale);
+        var ctx = cv.getContext('2d');
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        CW.renderSegment(ctx, S.cfg, layout, 0, layout.totalHeight, S.cfg._bgImg);
+      } catch (e) { console.error('预览渲染失败', e); }
+    });
+  }
+
+  var scheduleSave = CW.debounce(function () {
+    CW.store.save(S.cfg);
+    $('#saveHint').textContent = '已自动保存';
+  }, 400);
+
+  function recompute() {
+    $('#saveHint').textContent = '保存中…';
+    syncFromUI();
+    renderPreview();
+    scheduleSave();
+  }
+
+  /* ---------- 下载工具 ---------- */
+  function downloadCanvas(cv, name) {
+    return new Promise(function (res) {
+      cv.toBlob(function (blob) {
+        if (!blob) { res(false); return; }
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+        res(true);
+      }, 'image/png');
+    });
+  }
+
+  /* ---------- 绑定事件 ---------- */
+  function bindEvents() {
+    // 文字内容：输入即更新
+    ['#inpTitle', '#inpSubtitle', '#inpAuthor', '#inpCommissioner', '#inpBody'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        if (id === '#inpBody') updateWordCount();
+        recompute();
+      });
+    });
+
+    // 字体字号颜色行距段距对齐
+    ['#selTitleFont', '#selBodyFont', '#inpTitleSize', '#inpBodySize', '#inpTitleColor',
+      '#inpBodyColor', '#inpLineHeight', '#inpParaSpacing', '#selAlign',
+      '#inpWidth', '#inpPadding', '#inpSliceH'].forEach(function (id) {
+      var el = $(id);
+      el.addEventListener('input', function () {
+        var lbl = { '#inpTitleSize': 'valTitleSize', '#inpBodySize': 'valBodySize',
+          '#inpLineHeight': 'valLineHeight', '#inpParaSpacing': 'valPara',
+          '#inpWidth': 'valWidth', '#inpPadding': 'valPadding', '#inpSliceH': 'valSlice' }[id];
+        if (lbl) $('#' + lbl).textContent = el.value;
+        recompute();
+      });
+      el.addEventListener('change', recompute);
+    });
+
+    // 背景
+    $('#selBgType').addEventListener('change', function () { recompute(); updateBgControls(); });
+    ['#inpBgColor', '#inpBgColor2', '#selTexture'].forEach(function (id) {
+      $(id).addEventListener('input', recompute);
+    });
+
+    // 背景图上传
+    $('#btnBgImage').addEventListener('click', function () { $('#fileBgImage').click(); });
+    $('#fileBgImage').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var data = rd.result;
+        S.cfg.bg.type = 'image'; $('#selBgType').value = 'image'; updateBgControls();
+        S.cfg.bg.image = data;
+        var img = new Image(); img.onload = function () { S.cfg._bgImg = img; $('#bgImageHint').textContent = '已上传背景图'; recompute(); };
+        img.src = data;
+      };
+      rd.readAsDataURL(f);
+      e.target.value = '';
+    });
+
+    // DOCX 导入
+    $('#btnImportDocx').addEventListener('click', function () { $('#fileDocx').click(); });
+    $('#btnPickDocx').addEventListener('click', function () { $('#fileDocx').click(); });
+    $('#fileDocx').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      if (!/\.docx$/i.test(f.name)) { toast('只支持 .docx，老 .doc 请先在 Word 另存为 .docx'); e.target.value = ''; return; }
+      loading(true, '正在读取 Word…');
+      f.arrayBuffer().then(function (buf) { return CW.parseDocxText(buf); }).then(function (text) {
+        if (!text.trim()) throw new Error('没提取到文字（可能是图片扫描件）');
+        S.cfg.body = text; $('#inpBody').value = text; updateWordCount(); recompute();
+        loading(false); toast('正文已载入（' + text.replace(/\s/g, '').length + ' 字）');
+      }).catch(function (err) {
+        loading(false); toast('读取失败：' + (err && err.message || err));
+      });
+      e.target.value = '';
+    });
+
+    // 自定义字体
+    $('#btnCustomFont').addEventListener('click', function () { $('#fileCustomFont').click(); });
+    $('#fileCustomFont').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      loading(true, '正在加载字体…');
+      var rd = new FileReader();
+      rd.onload = function () {
+        var name = 'CWCustom_' + Date.now();
+        CW.registerCustomFont(name, rd.result).then(function () {
+          S.cfg.customFontName = name; S.cfg.customFontData = rd.result;
+          if (S.cfg.titleFont === 'custom') $('#selTitleFont').value = 'custom';
+          if (S.cfg.bodyFont === 'custom') $('#selBodyFont').value = 'custom';
+          $('#customFontHint').textContent = '已加载：' + name;
+          recompute(); loading(false); toast('字体已加载，选「自定义字体」即可使用');
+        }).catch(function (err) { loading(false); toast('字体加载失败：' + (err && err.message || err)); });
+      };
+      rd.readAsDataURL(f);
+      e.target.value = '';
+    });
+
+    // 导出长图
+    $('#btnExportLong').addEventListener('click', function () {
+      loading(true, '正在生成长图…');
+      ensureFont(function () {
+        try {
+          var cv = CW.renderLong(S.cfg, S.cfg._bgImg);
+          downloadCanvas(cv, '长文排版.png').then(function () { loading(false); toast('长图已导出'); });
+        } catch (e) { loading(false); toast('导出失败：' + e.message); }
+      });
+    });
+
+    // 等分切割导出
+    $('#btnExportSlices').addEventListener('click', function () {
+      loading(true, '正在切割导出…');
+      ensureFont(function () {
+        try {
+          var cans = CW.renderSlices(S.cfg, S.cfg.sliceH, S.cfg._bgImg);
+          var i = 0;
+          (function next() {
+            if (i >= cans.length) { loading(false); toast('已导出 ' + cans.length + ' 张等长图'); return; }
+            downloadCanvas(cans[i], '长文排版_' + (i + 1) + '.png').then(function () {
+              i++; setTimeout(next, 250);
+            });
+          })();
+        } catch (e) { loading(false); toast('导出失败：' + e.message); }
+      });
+    });
+
+    // 备份 / 恢复
+    $('#btnBackup').addEventListener('click', function () {
+      var blob = new Blob([CW.store.exportJSON(S.cfg)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = '长文排版备份.json';
+      document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 800);
+      toast('已导出备份 JSON');
+    });
+    $('#btnRestore').addEventListener('click', function () { $('#fileRestore').click(); });
+    $('#fileRestore').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var o = CW.store.importJSON(rd.result);
+          // 合并默认，避免缺字段
+          var d = defaultCfg();
+          for (var k in d) if (!(k in o)) o[k] = d[k];
+          S.cfg = o;
+          if (S.cfg.bg && S.cfg.bg.type === 'image' && S.cfg.bg.image) {
+            var img = new Image(); img.onload = function () { S.cfg._bgImg = img; fillUI(); renderPreview(); };
+            img.src = S.cfg.bg.image;
+          }
+          if (S.cfg.customFontName && S.cfg.customFontData) {
+            CW.registerCustomFont(S.cfg.customFontName, S.cfg.customFontData).then(function () { fillUI(); renderPreview(); })
+              .catch(function () { fillUI(); renderPreview(); });
+          }
+          fillUI(); renderPreview(); CW.store.save(S.cfg);
+          toast('已从备份恢复');
+        } catch (err) { toast('恢复失败：' + (err && err.message || err)); }
+      };
+      rd.readAsText(f);
+      e.target.value = '';
+    });
+  }
+
+  /* ---------- 启动 ---------- */
+  function boot() {
+    fillFontSelects();
+    var saved = CW.store.load();
+    if (saved) {
+      var d = defaultCfg();
+      for (var k in d) if (!(k in saved)) saved[k] = d[k];
+      S.cfg = saved;
+      if (S.cfg.bg && S.cfg.bg.type === 'image' && S.cfg.bg.image) {
+        var img = new Image();
+        img.onload = function () { S.cfg._bgImg = img; renderPreview(); };
+        img.src = S.cfg.bg.image;
+      }
+      if (S.cfg.customFontName && S.cfg.customFontData) {
+        CW.registerCustomFont(S.cfg.customFontName, S.cfg.customFontData).catch(function () {});
+      }
+    }
+    fillUI();
+    bindEvents();
+    renderPreview();
+  }
+
+  // 脚本位于 body 末尾（多文件版用 defer），此时 DOM 已就绪，直接启动即可
+  boot();
+})();
+
+</script>
+</body>
+</html>
