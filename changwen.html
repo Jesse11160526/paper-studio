@@ -4,6 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>长文排版工坊 · 本地版</title>
+  <!-- 全局错误兜底：任何报错都直接显示在页面顶部，便于排查「打不开」的问题 -->
+  <script>
+    (function () {
+      function showErr(msg) {
+        var b = document.getElementById('errBanner');
+        if (!b) {
+          b = document.createElement('div');
+          b.id = 'errBanner';
+          b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#b3392f;color:#fff;' +
+            'font:13px/1.6 system-ui,-apple-system,sans-serif;padding:12px 16px;white-space:pre-wrap;max-height:50%;overflow:auto;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+          var put = function () { (document.body || document.documentElement).appendChild(b); };
+          if (document.body) put(); else document.addEventListener('DOMContentLoaded', put);
+        }
+        b.style.display = 'block';
+        b.textContent = '⚠ 出错了（请截图发给汤圆）：\n' + msg;
+      }
+      window.showErr = showErr;
+      window.addEventListener('error', function (e) {
+        showErr((e.message || (e.error && e.error.message) || '未知错误') + (e.filename ? ('\n@ ' + e.filename + ':' + e.lineno) : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; showErr('Promise 未处理：' + ((r && r.message) || r));
+      });
+    })();
+  </script>
   <style>
 :root{
   --paper:#f7f4ef;
@@ -463,7 +488,7 @@ select.input{ appearance:none; background:#fffdfa; }
 
   /* 量算：返回绘制指令 ops + 总高度 */
   CW.computeLayout = function (cfg) {
-    var W = cfg.width | 0, pad = cfg.padding | 0;
+    var W = Math.max(360, cfg.width | 0), pad = Math.max(0, cfg.padding | 0);
     var cw = W - pad * 2;
     var align = cfg.align || 'left';
     var titleFont = cfg.titleSize + 'px ' + CW.fontStack(cfg.titleFont, cfg.customFontName);
@@ -730,8 +755,9 @@ select.input{ appearance:none; background:#fffdfa; }
   function renderPreview() {
     ensureFont(function () {
       try {
+        var w = Math.max(360, S.cfg.width | 0);
         var layout = CW.computeLayout(S.cfg);
-        var scale = Math.min(1, 460 / S.cfg.width);
+        var scale = Math.min(1, 460 / w);
         var cv = $('#previewCanvas');
         cv.width = Math.round(layout.W * scale);
         cv.height = Math.round(layout.totalHeight * scale);
@@ -939,7 +965,12 @@ select.input{ appearance:none; background:#fffdfa; }
   }
 
   // 脚本位于 body 末尾（多文件版用 defer），此时 DOM 已就绪，直接启动即可
-  boot();
+  try {
+    boot();
+  } catch (e) {
+    if (window.showErr) window.showErr('启动失败：' + ((e && e.message) || e));
+    else throw e;
+  }
 })();
 
 </script>
