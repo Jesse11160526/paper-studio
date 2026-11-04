@@ -666,10 +666,20 @@ select.input{ appearance:none; background:#fffdfa; }
     var t = $('#toast'); t.textContent = msg; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2200);
   }
+  var loadingWatch = null;
   function loading(on, text) {
     var l = $('#loading'); if (!l) return;
     if (on) { l.hidden = false; if (text) $('#loadingText').textContent = text; }
     else l.hidden = true;
+    // 看门狗：任何操作超过 25 秒没结束，自动关浮层并给出明确提示，绝不无限转圈
+    if (loadingWatch) { clearTimeout(loadingWatch); loadingWatch = null; }
+    if (on) {
+      loadingWatch = setTimeout(function () {
+        loadingWatch = null; l.hidden = true;
+        toast('处理超时：多半是图太大，手机内存不够。试试调小「画布宽度」、缩短正文，或改用「切割导出」');
+        if (window.showErr) showErr('处理超时（超过 25 秒）。通常是导出的图太大导致手机内存不足：请调小画布宽度、缩短正文，或改用切割导出。');
+      }, 25000);
+    }
   }
 
   /* ---------- 字体下拉 ---------- */
@@ -783,14 +793,16 @@ select.input{ appearance:none; background:#fffdfa; }
   /* ---------- 下载工具 ---------- */
   function downloadCanvas(cv, name) {
     return new Promise(function (res) {
-      cv.toBlob(function (blob) {
-        if (!blob) { res(false); return; }
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url; a.download = name; document.body.appendChild(a); a.click();
-        setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
-        res(true);
-      }, 'image/png');
+      try {
+        cv.toBlob(function (blob) {
+          if (!blob) { res(false); return; }
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url; a.download = name; document.body.appendChild(a); a.click();
+          setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+          res(true);
+        }, 'image/png');
+      } catch (e) { res(false); }
     });
   }
 
@@ -884,7 +896,11 @@ select.input{ appearance:none; background:#fffdfa; }
       ensureFont(function () {
         try {
           var cv = CW.renderLong(S.cfg, S.cfg._bgImg);
-          downloadCanvas(cv, '长文排版.png').then(function () { loading(false); toast('长图已导出'); });
+          downloadCanvas(cv, '长文排版.png').then(function (ok) {
+            loading(false);
+            if (ok) toast('长图已导出');
+            else toast('导出失败：图太大，手机装不下。试试调小画布宽度，或改用切割导出');
+          });
         } catch (e) { loading(false); toast('导出失败：' + e.message); }
       });
     });
@@ -898,7 +914,8 @@ select.input{ appearance:none; background:#fffdfa; }
           var i = 0;
           (function next() {
             if (i >= cans.length) { loading(false); toast('已导出 ' + cans.length + ' 张等长图'); return; }
-            downloadCanvas(cans[i], '长文排版_' + (i + 1) + '.png').then(function () {
+            downloadCanvas(cans[i], '长文排版_' + (i + 1) + '.png').then(function (ok) {
+              if (!ok) { loading(false); toast('导出失败：图太大，手机装不下。试试调小画布宽度或切割高度'); return; }
               i++; setTimeout(next, 250);
             });
           })();
