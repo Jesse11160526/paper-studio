@@ -200,10 +200,12 @@ select.input{ appearance:none; background:#fffdfa; }
           <label class="field"><span class="field-label">段距 <b id="valPara">24</b> px</span>
             <input id="inpParaSpacing" class="input range" type="range" min="0" max="80" step="2"></label>
         </div>
-        <label class="field"><span class="field-label">对齐</span>
+        <label class="field"><span class="field-label">正文对齐（首行自动缩进 2 字符）</span>
           <select id="selAlign" class="input">
+            <option value="justify">两端对齐（推荐）</option>
             <option value="left">居左</option>
             <option value="center">居中</option>
+            <option value="right">居右</option>
           </select></label>
         <button class="btn btn-ghost btn-block" id="btnCustomFont">上传自定义字体(.ttf/.otf)</button>
         <input type="file" id="fileCustomFont" accept=".ttf,.otf,font/ttf,font/otf" hidden>
@@ -458,26 +460,35 @@ select.input{ appearance:none; background:#fffdfa; }
 <script>
 /* 长文排版工坊 · 排版引擎
  * 负责把配置量算成「绘制指令」，并支持按切片渲染（长图 / 等分切割共用）。
+ * 排版规则：
+ *  - 标题 / 副标题 / 作者 / 约稿人：始终居中，与正文之间用一条细线分隔
+ *  - 正文：默认两端对齐（可切居左/居中/居右），首行缩进 2 字符
+ *  - 空行：自动识别并删除（空行只用来分段，不占高度）
  */
 (function () {
   var CW = window.CW;
   var mctx = document.createElement('canvas').getContext('2d');
 
-  /* 按宽度把一段文字折行（CJK 逐字、遇空格优先断行） */
-  function wrapText(ctx, text, font, maxW) {
+  /* 按宽度把一段文字折行（CJK 逐字、遇空格优先断行）
+   * opts.firstIndent：首行额外缩进的像素（首行可用宽度相应减少）
+   * 返回的行里不再包含空行（空行一律删除） */
+  function wrapText(ctx, text, font, maxW, firstIndent) {
     ctx.font = font;
     var lines = [];
     var paras = String(text == null ? '' : text).split('\n');
     for (var p = 0; p < paras.length; p++) {
-      var para = paras[p];
-      if (para === '') { lines.push(''); continue; }
+      var para = paras[p].replace(/\s+$/g, '');
+      if (para.replace(/\s/g, '') === '') continue; // 空行：删除
       var cur = '';
+      // 首行缩进：只作用于整段的第一行
+      var avail = (p === 0 && lines.length === 0 && firstIndent) ? maxW - firstIndent : maxW;
       for (var i = 0; i < para.length; i++) {
         var ch = para[i];
         var test = cur + ch;
-        if (ctx.measureText(test).width > maxW && cur !== '') {
+        if (ctx.measureText(test).width > avail && cur !== '') {
           lines.push(cur.replace(/\s+$/, ''));
           cur = /^\s/.test(ch) ? '' : ch;
+          avail = maxW; // 后续行不缩进
         } else {
           cur = test;
         }
@@ -491,65 +502,84 @@ select.input{ appearance:none; background:#fffdfa; }
   CW.computeLayout = function (cfg) {
     var W = Math.max(360, cfg.width | 0), pad = Math.max(0, cfg.padding | 0);
     var cw = W - pad * 2;
-    var align = cfg.align || 'left';
+    var align = cfg.align || 'justify';
     var titleFont = cfg.titleSize + 'px ' + CW.fontStack(cfg.titleFont, cfg.customFontName);
     var subFont = Math.round(cfg.titleSize * 0.6) + 'px ' + CW.fontStack(cfg.titleFont, cfg.customFontName);
     var metaFont = Math.round(cfg.bodySize * 0.92) + 'px ' + CW.fontStack(cfg.bodyFont, cfg.customFontName);
     var bodyFont = cfg.bodySize + 'px ' + CW.fontStack(cfg.bodyFont, cfg.customFontName);
     var bodyLH = Math.round(cfg.bodySize * cfg.lineHeight);
     var paraGap = cfg.paraSpacing | 0;
+    var indent = Math.round(cfg.bodySize * 2); // 首行缩进 2 字符
     var titleColor = cfg.titleColor, bodyColor = cfg.bodyColor;
 
     var ops = [];
     var y = pad;
 
-    // 标题（可多行）
+    /* ---------- 头部（一律居中） ---------- */
     if (cfg.title) {
-      var tl = wrapText(mctx, cfg.title, titleFont, cw);
-      tl.forEach(function (ln, i) {
-        ops.push({ kind: 'title', text: ln, y: y, font: titleFont, color: titleColor, align: align });
+      var tl = wrapText(mctx, cfg.title, titleFont, cw, 0);
+      tl.forEach(function (ln) {
+        ops.push({ kind: 'title', text: ln, y: y, font: titleFont, color: titleColor, align: 'center' });
         y += Math.round(cfg.titleSize * 1.18);
       });
     }
     y += Math.round(cfg.titleSize * 0.45);
 
-    // 副标题
     if (cfg.subtitle) {
-      var sl = wrapText(mctx, cfg.subtitle, subFont, cw);
+      var sl = wrapText(mctx, cfg.subtitle, subFont, cw, 0);
       sl.forEach(function (ln) {
-        ops.push({ kind: 'sub', text: ln, y: y, font: subFont, color: titleColor, align: align });
+        ops.push({ kind: 'sub', text: ln, y: y, font: subFont, color: titleColor, align: 'center' });
         y += Math.round(cfg.titleSize * 0.72);
       });
       y += Math.round(cfg.titleSize * 0.3);
     }
 
-    // 作者 / 约稿人
     var meta = [];
     if (cfg.author) meta.push('作者：' + cfg.author);
     if (cfg.commissioner) meta.push('约稿人：' + cfg.commissioner);
     if (meta.length) {
-      ops.push({ kind: 'meta', text: meta.join('　·　'), y: y, font: metaFont, color: titleColor, align: align });
+      ops.push({ kind: 'meta', text: meta.join('　·　'), y: y, font: metaFont, color: titleColor, align: 'center' });
       y += Math.round(cfg.bodySize * 1.2);
     }
 
-    y += Math.round(cfg.titleSize * 0.7); // 标题区与正文之间的留白
+    /* ---------- 细分隔线（头部与正文之间） ---------- */
+    y += Math.round(cfg.titleSize * 0.55);
+    ops.push({ kind: 'rule', y: y, color: titleColor, alpha: 0.35, x1: pad, x2: W - pad });
+    y += Math.round(cfg.bodySize * 1.1); // 线与正文第一行的距离
     var headerBottom = y;
 
-    // 正文：按自然段（空行分段）
-    var blocks = String(cfg.body || '').split(/\n{2,}/);
+    /* ---------- 正文 ---------- */
+    var blocks = String(cfg.body || '').split(/\n{2,}/); // 空行分段
     for (var b = 0; b < blocks.length; b++) {
       var blk = blocks[b].replace(/^\n+|\n+$/g, '');
-      if (blk === '') continue;
-      var bl = wrapText(mctx, blk, bodyFont, cw);
+      if (blk.replace(/\s/g, '') === '') continue; // 整段空白：跳过
+      var bl = wrapText(mctx, blk, bodyFont, cw, align === 'left' || align === 'justify' ? indent : 0);
       for (var k = 0; k < bl.length; k++) {
-        ops.push({ kind: 'body', text: bl[k], y: y, font: bodyFont, color: bodyColor, align: align });
+        var ln = bl[k];
+        if (ln === '') continue; // 空行：删除，不占高度
+        var isLast = (k === bl.length - 1);
+        var op = { kind: 'body', text: ln, y: y, font: bodyFont, color: bodyColor };
+        if (align === 'justify' && !isLast && ln.length > 1) {
+          // 两端对齐：逐字拉开间距，首行从缩进处起排
+          var x0 = (k === 0) ? indent : 0;
+          mctx.font = bodyFont;
+          var lineW = mctx.measureText(ln).width;
+          var effW = cw - x0;
+          var spacing = Math.max(0, (effW - lineW) / (ln.length - 1));
+          op.align = 'left'; op.x = pad + x0; op.spacing = spacing;
+        } else if (align === 'center' || align === 'right') {
+          op.align = align; op.x = null;
+        } else {
+          op.align = 'left'; op.x = pad + ((k === 0 && (align === 'left' || align === 'justify')) ? indent : 0);
+        }
+        ops.push(op);
         y += bodyLH;
       }
       y += paraGap;
     }
 
     // 高度由内容决定；只保留一个很小的最小高度，避免空稿时画布塌成 0
-    var totalHeight = Math.max(y + pad, pad * 2 + 200);
+    var totalHeight = Math.max(y + pad - paraGap, pad * 2 + 200);
     return {
       W: W, pad: pad, cw: cw, align: align, bodyLH: bodyLH,
       ops: ops, headerBottom: headerBottom, totalHeight: totalHeight
@@ -566,11 +596,39 @@ select.input{ appearance:none; background:#fffdfa; }
     for (var i = 0; i < layout.ops.length; i++) {
       var op = layout.ops[i];
       if (op.y < segTop - 400 || op.y > segTop + segH + 400) continue;
+      if (op.kind === 'rule') {
+        // 细分隔线
+        ctx.globalAlpha = op.alpha;
+        ctx.strokeStyle = op.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(op.x1, Math.round(op.y) + 0.5);
+        ctx.lineTo(op.x2, Math.round(op.y) + 0.5);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        continue;
+      }
       ctx.font = op.font;
       ctx.fillStyle = op.color;
-      ctx.textAlign = op.align === 'center' ? 'center' : 'left';
-      var x = op.align === 'center' ? layout.W / 2 : layout.pad;
-      ctx.fillText(op.text, x, op.y);
+      if (op.spacing) {
+        // 两端对齐：逐字绘制，字距 = spacing
+        ctx.textAlign = 'left';
+        var x = op.x;
+        for (var c = 0; c < op.text.length; c++) {
+          var ch = op.text[c];
+          ctx.fillText(ch, x, op.y);
+          x += ctx.measureText(ch).width + op.spacing;
+        }
+      } else if (op.align === 'center') {
+        ctx.textAlign = 'center';
+        ctx.fillText(op.text, layout.W / 2, op.y);
+      } else if (op.align === 'right') {
+        ctx.textAlign = 'right';
+        ctx.fillText(op.text, layout.W - layout.pad, op.y);
+      } else {
+        ctx.textAlign = 'left';
+        ctx.fillText(op.text, op.x != null ? op.x : layout.pad, op.y);
+      }
     }
     ctx.restore();
   };
@@ -647,11 +705,11 @@ select.input{ appearance:none; background:#fffdfa; }
       subtitle: '副标题写这里',
       author: '',
       commissioner: '',
-      body: '把正文粘贴到这里，或点上方「导入 DOCX」。\n\n空行分段，段落之间会自动留出间距。字号、颜色、背景都能调，调完右侧实时预览。',
+      body: '把正文粘贴到这里，或点上方「导入 DOCX」。\n\n正文两端对齐、首行自动缩进 2 字符；空行会自动删除（空行只用来分段）。字号、颜色、背景都能调，调完右侧实时预览。',
       titleFont: 'song', bodyFont: 'system',
       titleSize: 64, bodySize: 34,
       titleColor: '#2b2620', bodyColor: '#3a352e',
-      lineHeight: 1.8, paraSpacing: 24, align: 'left',
+      lineHeight: 1.8, paraSpacing: 24, align: 'justify',
       width: 1080, padding: 90,
       bg: { type: 'solid', color: '#f7f3ea', color2: '#e9dcc6', texture: 'rice' },
       customFontName: '', customFontData: '',
@@ -823,6 +881,7 @@ select.input{ appearance:none; background:#fffdfa; }
       '#inpWidth', '#inpPadding', '#inpSliceH'].forEach(function (id) {
       var el = $(id);
       el.addEventListener('input', function () {
+        if (id === '#selAlign') S.cfg.alignTouched = true; // 用户手动选过对齐方式，之后不再迁移
         var lbl = { '#inpTitleSize': 'valTitleSize', '#inpBodySize': 'valBodySize',
           '#inpLineHeight': 'valLineHeight', '#inpParaSpacing': 'valPara',
           '#inpWidth': 'valWidth', '#inpPadding': 'valPadding', '#inpSliceH': 'valSlice' }[id];
@@ -967,6 +1026,8 @@ select.input{ appearance:none; background:#fffdfa; }
     if (saved) {
       var d = defaultCfg();
       for (var k in d) if (!(k in saved)) saved[k] = d[k];
+      // 旧存档迁移：以前默认居左，现在默认两端对齐（用户手动选过居左的存档保持不变）
+      if (saved.align === 'left' && !saved.alignTouched) saved.align = 'justify';
       S.cfg = saved;
       if (S.cfg.bg && S.cfg.bg.type === 'image' && S.cfg.bg.image) {
         var img = new Image();
