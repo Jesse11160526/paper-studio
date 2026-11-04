@@ -126,6 +126,7 @@ select.input{ appearance:none; background:#fffdfa; }
   position:fixed; inset:0; background:rgba(247,244,239,.7); backdrop-filter:blur(2px);
   display:flex; align-items:center; justify-content:center; gap:12px; z-index:60; color:var(--brown); font-size:14px;
 }
+.loading[hidden]{ display:none !important; }
 .spinner{ width:22px; height:22px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
