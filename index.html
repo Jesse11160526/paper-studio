@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#f7f4ef">
+<title>纸艺工坊 · 折页与长文排版</title>
+<style>
+  :root{
+    --paper:#f7f4ef; --paper2:#efe9df; --brown:#8a6a45; --brown-d:#6f5235;
+    --ink:#3a352e; --muted:#8a8175; --line:#e3dccf; --accent:#9c6b3f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #fffdf8 0%, var(--paper) 45%, var(--paper2) 100%) fixed;
+    color:var(--ink);
+    font-family:"Songti SC","Noto Serif CJK SC",ui-serif,Georgia,"Times New Roman",serif;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:max(28px,env(safe-area-inset-top)) 18px 40px;
+  }
+  .wrap{width:100%; max-width:720px;}
+  header{text-align:center; margin:18px 0 26px;}
+  .mark{
+    width:54px;height:54px;border-radius:16px;margin:0 auto 14px;
+    background:linear-gradient(135deg,var(--brown),var(--accent));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 18px rgba(138,106,69,.35);
+  }
+  .mark svg{width:30px;height:30px;}
+  h1{font-size:27px; margin:0 0 6px; letter-spacing:3px; font-weight:700;}
+  .sub{color:var(--muted); font-size:14px; letter-spacing:1px;}
+  .grid{display:grid; grid-template-columns:1fr; gap:18px;}
+  @media(min-width:640px){ .grid{grid-template-columns:1fr 1fr;} }
+  .card{
+    display:block; text-decoration:none; color:inherit;
+    background:rgba(255,255,255,.72); border:1px solid var(--line);
+    border-radius:20px; padding:22px 20px; position:relative; overflow:hidden;
+    box-shadow:0 8px 24px rgba(120,95,60,.10);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:active{transform:translateY(2px) scale(.99); box-shadow:0 4px 14px rgba(120,95,60,.12);}
+  .card .ico{
+    width:46px;height:46px;border-radius:13px;
+    background:linear-gradient(135deg,#f3e7d6,#e7d3b6);
+    display:flex;align-items:center;justify-content:center;margin-bottom:14px;
+  }
+  .card h2{margin:0 0 8px; font-size:21px; letter-spacing:2px;}
+  .card p{margin:0; color:var(--muted); font-size:13.5px; line-height:1.7;}
+  .card .tags{margin-top:14px; display:flex; flex-wrap:wrap; gap:7px;}
+  .tag{font-size:11.5px; color:var(--brown-d); background:#f1e7d8;
+       border:1px solid #e7d6bf; border-radius:999px; padding:3px 10px;
+       font-family:ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .go{position:absolute; right:18px; top:20px; color:var(--accent); font-size:22px;}
+  .note{
+    margin-top:28px; font-size:12.5px; color:var(--muted); text-align:center;
+    line-height:1.8; font-family:ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .note b{color:var(--brown-d);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 4h9l3 3v13H6z"/><path d="M15 4v3h3"/><path d="M9 11h6M9 14.5h6"/>
+      </svg>
+    </div>
+    <h1>纸艺工坊</h1>
+    <div class="sub">折页排版 · 长文排版 · 手机也能用</div>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="zheye.html">
+      <span class="go">›</span>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8a6a45" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 5h7v14H4z"/><path d="M13 5h7v14h-7z"/><path d="M11 4v16"/>
+        </svg>
+      </div>
+      <h2>折页工坊</h2>
+      <p>粘贴文字自动排版，挑纸张纹理与字体，叠艺术溶图，导出印刷级 PDF（含出血与裁切标记）。</p>
+      <div class="tags"><span class="tag">自动排版</span><span class="tag">纸张纹理</span><span class="tag">PDF 导出</span></div>
+    </a>
+
+    <a class="card" href="changwen.html">
+      <span class="go">›</span>
+      <div class="ico">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8a6a45" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+      </div>
+      <h2>长文排版</h2>
+      <p>标题/副标题/作者/约稿人一键填充，字体颜色大小随意调，背景任意换，导出长图或等量切片图发社交媒体。</p>
+      <div class="tags"><span class="tag">长图导出</span><span class="tag">切片图</span><span class="tag">Word 导入</span></div>
+    </a>
+  </div>
+
+  <div class="note">
+    所有内容都保存在<b>你自己的浏览器</b>里，不会上传到任何服务器。<br>
+    换手机或清缓存前，记得在工具内用「备份 / 导出」按钮把作品存成文件带走。
+  </div>
+</div>
+</body>
+</html>
