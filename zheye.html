@@ -2011,12 +2011,22 @@ input[type=number]{ -moz-appearance:textfield; }
     _toastTimer = setTimeout(function () { t.hidden = true; }, ms || 2200);
   };
 
+  var _loadingWatch = null;
   ZY.loading = function (on, text) {
     var l = $('#loading');
     if (!l) return;
     var t = $('#loadingText');
     if (t) t.textContent = text || '处理中…';
     l.hidden = !on;
+    // 看门狗：任何操作超过 25 秒没结束，自动关浮层并提示，绝不无限转圈
+    if (_loadingWatch) { clearTimeout(_loadingWatch); _loadingWatch = null; }
+    if (on) {
+      _loadingWatch = setTimeout(function () {
+        _loadingWatch = null;
+        l.hidden = true;
+        ZY.toast('处理超时：多半是尺寸太大，手机内存不够。试试降低 DPI 或调小尺寸', 5000);
+      }, 25000);
+    }
   };
 
   ZY.sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
