@@ -41,6 +41,8 @@
     transition:transform .15s ease, box-shadow .15s ease;
   }
   .card:active{transform:translateY(2px) scale(.99); box-shadow:0 4px 14px rgba(120,95,60,.12);}
+  /* 卡片内装饰元素不拦截点击，保证手机上整张卡片都能点 */
+  .card .ico, .card .go, .card svg, .card .tags, .card .tag, .card h2, .card p { pointer-events:none; }
   .card .ico{
     width:46px;height:46px;border-radius:13px;
     background:linear-gradient(135deg,#f3e7d6,#e7d3b6);
@@ -59,6 +61,11 @@
   }
   .note b{color:var(--brown-d);}
 </style>
+  <script>
+    (function(){function showErr(m){var b=document.getElementById('errBanner');if(!b){b=document.createElement('div');b.id='errBanner';b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:#b3392f;color:#fff;font:13px/1.6 system-ui,sans-serif;padding:12px 16px;white-space:pre-wrap;max-height:50%;overflow:auto';document.body.appendChild(b);}b.style.display='block';b.textContent='⚠ 主页出错了：
+'+m;}window.showErr=showErr;window.addEventListener('error',function(e){showErr((e.message||'未知错误')+(e.filename?('
+@ '+e.filename+':'+e.lineno):''));});window.addEventListener('unhandledrejection',function(e){showErr('Promise: '+((e.reason&&e.reason.message)||e.reason));});})();
+  </script>
 </head>
 <body>
 <div class="wrap">
