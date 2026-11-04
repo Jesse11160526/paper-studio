@@ -72,14 +72,17 @@ body{
 .btn-ghost{ background:transparent; }
 .btn-block{ width:100%; margin-top:10px; }
 
-/* 布局 */
-.layout{ flex:1 1 auto; display:flex; min-height:0; }
+/* 布局：控制面板在上，预览在下方（纵向排列） */
+.layout{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
 .panel{
-  width:380px; flex:0 0 380px; overflow-y:auto; padding:18px;
-  background:var(--paper); border-right:1px solid var(--line);
+  width:100%; flex:0 0 auto; max-height:50vh; overflow-y:auto; padding:18px;
+  background:var(--paper); border-bottom:1px solid var(--line);
 }
 .panel::-webkit-scrollbar{ width:8px; }
 .panel::-webkit-scrollbar-thumb{ background:#d8cdba; border-radius:8px; }
+/* 面板内容横向铺开，避免上下布局后整列太窄浪费宽度 */
+.panel-inner{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; align-items:start; }
+.panel .block{ margin-bottom:0; }
 
 .block{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow); }
 .block-title{ margin:0 0 12px; font-size:14px; color:var(--brown); border-left:3px solid var(--brown-2); padding-left:8px; }
@@ -131,8 +134,8 @@ select.input{ appearance:none; background:#fffdfa; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
 @media (max-width:860px){
-  .layout{ flex-direction:column; }
-  .panel{ width:100%; flex:0 0 auto; max-height:46vh; }
+  .panel-inner{ grid-template-columns:1fr; }
+  .panel{ max-height:46vh; }
   .stage{ min-height:54vh; }
 }
 
@@ -153,8 +156,9 @@ select.input{ appearance:none; background:#fffdfa; }
   </header>
 
   <main class="layout">
-    <!-- 左侧控制面板 -->
+    <!-- 上半部分：控制面板 -->
     <aside class="panel">
+      <div class="panel-inner">
       <section class="block">
         <h3 class="block-title">文字内容</h3>
         <label class="field"><span class="field-label">标题</span>
@@ -241,6 +245,24 @@ select.input{ appearance:none; background:#fffdfa; }
       </section>
 
       <section class="block">
+        <h3 class="block-title">水印</h3>
+        <label class="field"><span class="field-label">水印文字（留空则不加水印）</span>
+          <input id="inpWmText" class="input" type="text" placeholder="例如：仅供预览 / @你的名字"></label>
+        <div class="row2">
+          <label class="field"><span class="field-label">透明度 <b id="valWmOpacity">12</b>%</span>
+            <input id="inpWmOpacity" class="input range" type="range" min="3" max="80" step="1"></label>
+          <label class="field"><span class="field-label">字号 <b id="valWmSize">40</b> px</span>
+            <input id="inpWmSize" class="input range" type="range" min="20" max="120" step="2"></label>
+        </div>
+        <label class="field"><span class="field-label">排列方式（宋体 · 倾斜半透明）</span>
+          <select id="selWmMode" class="input">
+            <option value="tile">平铺（整页重复，推荐防盗用）</option>
+            <option value="center">居中（单个大水印）</option>
+          </select></label>
+        <div class="hint">水印用宋体绘制，始终半透明；切割导出时每张图都会有水印。</div>
+      </section>
+
+      <section class="block">
         <h3 class="block-title">画布与导出</h3>
         <div class="row2">
           <label class="field"><span class="field-label">画布宽 <b id="valWidth">1080</b> px</span>
@@ -252,9 +274,10 @@ select.input{ appearance:none; background:#fffdfa; }
           <input id="inpSliceH" class="input range" type="range" min="600" max="2000" step="20"></label>
         <div class="hint">「等分切割导出」会把长图按「每张高度」切成大小相同的图，方便发小红书 / 朋友圈。</div>
       </section>
+      </div><!-- /panel-inner -->
     </aside>
 
-    <!-- 右侧预览 -->
+    <!-- 下半部分：预览 -->
     <section class="stage">
       <div class="stage-bar">
         <span class="stage-title">实时预览</span>
@@ -464,6 +487,7 @@ select.input{ appearance:none; background:#fffdfa; }
  *  - 标题 / 副标题 / 作者 / 约稿人：始终居中，与正文之间用一条细线分隔
  *  - 正文：默认两端对齐（可切居左/居中/居右），首行缩进 2 字符
  *  - 空行：自动识别并删除（空行只用来分段，不占高度）
+ *  - 水印：宋体、倾斜、半透明，透明度可调；支持平铺 / 居中两种排列
  */
 (function () {
   var CW = window.CW;
@@ -586,6 +610,49 @@ select.input{ appearance:none; background:#fffdfa; }
     };
   };
 
+  /* ---------- 水印绘制（宋体 · 倾斜 · 半透明） ----------
+   * wm: { text, opacity(0-1), size, mode: 'tile'|'center' }
+   * 坐标使用「整图绝对坐标」，因此等分切割时每张切片上的水印天然连续。 */
+  CW.SONG_STACK = '"Songti SC","SimSun","NSimSun","STSong",serif';
+  CW.drawWatermark = function (ctx, wm, W, segTop, segH) {
+    if (!wm) return;
+    var text = String(wm.text || '').trim();
+    if (!text) return;
+    var size = Math.min(200, Math.max(14, wm.size | 0 || 40));
+    var alpha = Math.min(0.85, Math.max(0.02, +wm.opacity || 0.12));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#6a5b49'; // 暖灰棕：半透明下不抢正文
+    ctx.font = size + 'px ' + CW.SONG_STACK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var ang = -24 * Math.PI / 180; // 统一倾斜角
+    if (wm.mode === 'center') {
+      ctx.save();
+      ctx.translate(W / 2, segTop + segH / 2);
+      ctx.rotate(ang);
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    } else {
+      // 平铺：网格铺满整个可视区间，奇数行水平错开半格
+      var stepX = Math.max(size * text.length * 1.6, size * 6);
+      var stepY = size * 5;
+      var y0 = Math.floor(segTop / stepY) * stepY;
+      for (var gy = y0 - stepY; gy <= segTop + segH + stepY; gy += stepY) {
+        var row = Math.round(gy / stepY);
+        var offX = (row % 2 === 0) ? 0 : stepX / 2;
+        for (var gx = -stepX; gx <= W + stepX; gx += stepX) {
+          ctx.save();
+          ctx.translate(gx + offX, gy);
+          ctx.rotate(ang);
+          ctx.fillText(text, 0, 0);
+          ctx.restore();
+        }
+      }
+    }
+    ctx.restore();
+  };
+
   /* 渲染某一纵向区间 [segTop, segTop+segH) 到 ctx（已按 segH 裁剪） */
   CW.renderSegment = function (ctx, cfg, layout, segTop, segH, bgImg) {
     ctx.save();
@@ -630,6 +697,8 @@ select.input{ appearance:none; background:#fffdfa; }
         ctx.fillText(op.text, op.x != null ? op.x : layout.pad, op.y);
       }
     }
+    // 水印最后绘制（盖在内容上方，半透明不遮字）
+    CW.drawWatermark(ctx, cfg.watermark, layout.W, segTop, segH);
     ctx.restore();
   };
 
@@ -712,6 +781,7 @@ select.input{ appearance:none; background:#fffdfa; }
       lineHeight: 1.8, paraSpacing: 24, align: 'justify',
       width: 1080, padding: 90,
       bg: { type: 'solid', color: '#f7f3ea', color2: '#e9dcc6', texture: 'rice' },
+      watermark: { text: '', opacity: 0.12, size: 40, mode: 'tile' },
       customFontName: '', customFontData: '',
       sliceH: 1080
     };
@@ -774,6 +844,12 @@ select.input{ appearance:none; background:#fffdfa; }
     $('#inpBgColor').value = c.bg.color;
     $('#inpBgColor2').value = c.bg.color2 || '#e9dcc6';
     $('#selTexture').value = c.bg.texture || 'rice';
+    // 水印
+    var wm = c.watermark || (c.watermark = { text: '', opacity: 0.12, size: 40, mode: 'tile' });
+    $('#inpWmText').value = wm.text || '';
+    $('#inpWmOpacity').value = Math.round(wm.opacity * 100); $('#valWmOpacity').textContent = Math.round(wm.opacity * 100);
+    $('#inpWmSize').value = wm.size; $('#valWmSize').textContent = wm.size;
+    $('#selWmMode').value = wm.mode || 'tile';
     updateBgControls();
     updateWordCount();
     if (c.customFontName) $('#customFontHint').textContent = '已加载：' + c.customFontName;
@@ -815,6 +891,12 @@ select.input{ appearance:none; background:#fffdfa; }
     c.bg.color = $('#inpBgColor').value;
     c.bg.color2 = $('#inpBgColor2').value;
     c.bg.texture = $('#selTexture').value;
+    // 水印
+    if (!c.watermark) c.watermark = { text: '', opacity: 0.12, size: 40, mode: 'tile' };
+    c.watermark.text = $('#inpWmText').value;
+    c.watermark.opacity = Math.min(0.85, Math.max(0.03, (+$('#inpWmOpacity').value || 12) / 100));
+    c.watermark.size = +$('#inpWmSize').value || 40;
+    c.watermark.mode = $('#selWmMode').value;
   }
 
   /* ---------- 预览 ---------- */
@@ -826,7 +908,7 @@ select.input{ appearance:none; background:#fffdfa; }
       try {
         var w = Math.max(360, S.cfg.width | 0);
         var layout = CW.computeLayout(S.cfg);
-        var scale = Math.min(1, 460 / w);
+        var scale = Math.min(1, 560 / w);
         var cv = $('#previewCanvas');
         cv.width = Math.round(layout.W * scale);
         cv.height = Math.round(layout.totalHeight * scale);
@@ -895,6 +977,19 @@ select.input{ appearance:none; background:#fffdfa; }
     $('#selBgType').addEventListener('change', function () { recompute(); updateBgControls(); });
     ['#inpBgColor', '#inpBgColor2', '#selTexture'].forEach(function (id) {
       $(id).addEventListener('input', recompute);
+    });
+
+    // 水印
+    ['#inpWmText', '#selWmMode'].forEach(function (id) {
+      $(id).addEventListener('input', recompute);
+      $(id).addEventListener('change', recompute);
+    });
+    ['#inpWmOpacity', '#inpWmSize'].forEach(function (id) {
+      var lbl = { '#inpWmOpacity': 'valWmOpacity', '#inpWmSize': 'valWmSize' }[id];
+      $(id).addEventListener('input', function () {
+        $('#' + lbl).textContent = $(id).value;
+        recompute();
+      });
     });
 
     // 背景图上传
